@@ -1,0 +1,31 @@
+[package]
+name = "cccs"
+version = "1.1.0"
+authors = ["Yueqi Jin <jinyueqi@pku.edu.cn>"]
+edition = "2021"
+
+[package.metadata.maturin]
+maintainer = "Yueqi Jin"
+maintainer-email = "jinyueqi@pku.edu.cn"
+
+# [workspace]
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "cccs"
+path = "src/lib.rs"
+crate-type = ["lib", "staticlib"]
+
+[dependencies]
+docopt = "=1.1.0"
+serde = "=1.0"
+anyhow = "=1.0"
+chrono = "=0.4.19"
+bio = "=0.33.0"
+libc = "=0.2"
+seq_io = "=0.3.1"
+flate2 = "=1.0.20"
+indicatif = "=0.15.0"
+regex = "=1.7.3"
+pyo3 = { version = "=0.16.5", features = ["extension-module", "anyhow"] }
+rust-spoa = { git = "https://github.com/Kevinzjy/rust-spoa", rev = "fad38175e172ddd8cc51cd8ccd61e93f48191ecf" }

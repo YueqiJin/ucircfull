@@ -1,0 +1,4 @@
+language = "C++"
+include_guard = "__LIB_CCCS_HPP"
+pragma_once = true
+namespace = "cccs"

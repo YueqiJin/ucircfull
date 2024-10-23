@@ -1,0 +1,46 @@
+Bootstrap: docker
+From: dh-mirror.gitverse.ru/mambaorg/micromamba
+Stage: devel
+
+%files
+ucircfull.zip /venv/
+
+%post
+sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list.d/debian.sources
+apt update
+apt install cmake make g++ gcc libboost-all-dev libseqan3-dev libseqan2-dev git unzip -y
+micromamba install -n base -c conda-forge conda-pack
+micromamba create -n ucircfull -c conda-forge -c bioconda minimap2 rust porechop seqkit samtools
+micromamba run -n base conda-pack -p /opt/conda/envs/ucircfull -o /opt/env.tar
+#mkdir /venv && cd /venv
+cd /venv
+tar -xf /opt/env.tar && rm /opt/env.tar
+unzip ucircfull.zip
+rm ucircfull.zip
+mkdir -p build
+cd build
+#cmake .. -DCMAKE_BUILD_TYPE=Debug
+#rm -rf /venv/include/cccs/target/debug/build/
+PATH="/venv/bin:$PATH"
+cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/venv
+make
+cmake --install . --prefix /venv
+
+Bootstrap: docker
+From: dh-mirror.gitverse.ru/library/debian
+Stage: final
+
+%files from devel
+/venv /venv
+
+%environment
+export LC_ALL=C
+export PATH="/venv/build/release/bin:/venv/bin:$PATH"
+
+%post
+sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list.d/debian.sources
+apt update
+apt install -y libncurses5-dev zlib1g-dev libbz2-dev liblzma-dev libboost-all-dev libseqan3-dev libseqan2-dev
+
+%help
+Built by Yueqi Jin on 2023.09.06
