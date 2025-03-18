@@ -196,7 +196,7 @@ namespace circfull
 
 	int trimAdaptor(const string &porechop, const fs::path &fastqFile, const fs::path &outFile, size_t nthread)
 	{
-		string cmdLine = porechop + " -i " + fastqFile.string() + " -o " + outFile.string() + " --barcode_threshold 95 --check_reads 1000 -v 1 --no_split -t " + to_string(nthread);
+		string cmdLine = porechop + " -i " + fastqFile.string() + " -o " + outFile.string() + " --barcode_threshold 95 --check_reads 1000 -v 0 --no_split -t " + to_string(nthread);
 		return system(cmdLine.c_str());
 	}
 
