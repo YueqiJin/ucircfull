@@ -116,7 +116,11 @@ namespace circfull
 		std::cout << "[INFO] Input stranded fastq file: " << opt.strandFastq << std::endl;
 		std::cout << "[INFO] Reference fasta file: " << opt.referenceFasta << std::endl;
 		std::cout << "[INFO] Reference annotation file: " << opt.annotationGTF << std::endl;
-		std::cout << "[INFO] Output path: " << opt.circCallOutputPath << std::endl;
+		if (opt.modCircCall == CircfullOption::CircCallMod::CIRI) {
+			std::cout << "[INFO] Output path: " << opt.circCallOutputPath << std::endl;
+		} else {
+			std::cout << "[INFO] Output path: " << opt.oPath << std::endl;
+		}
 		if (!opt.useBam)
 		{
 			// Checking input files exist
@@ -133,6 +137,12 @@ namespace circfull
 
 			if (opt.modCircCall == CircfullOption::CircCallMod::ucRG)
 			{
+				if (!checkFile(opt.umiClustTab))
+				{
+					std::cerr << "Error: " << opt.umiClustTab << " does not exist" << std::endl;
+					return 1;
+				}
+
 				// read in UMI cluster file
 				printTimeInfo("Scaning candidate circRNA reads:");
 				std::map<std::string, std::string> umiCluster = readUMIClustInfo(opt.umiClustTab);

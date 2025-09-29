@@ -684,9 +684,9 @@ namespace circfull
 				if (iter != circCandidates.end())
 					nowId = iter->queryId;
 			}
+			tp.join();
 			if (circfull::debug)
 				BSListFileStream.close();
-			tp.join();
 			return BSList;
 		}
 

@@ -248,6 +248,16 @@ namespace circfull
 	void applyCircCallOption(CircfullOption &opt, const argparse::ArgumentParser &args)
 	{
 		opt.call = CircfullOption::mod::CIRC_CALL;
+		// circRNA calling mod
+		std::string circCallMod = args.get<string>("-m");
+		if (circCallMod == "RG")
+			opt.modCircCall = CircfullOption::CircCallMod::RG;
+		else if (circCallMod == "cRG")
+			opt.modCircCall = CircfullOption::CircCallMod::cRG;
+		else if (circCallMod == "ucRG")
+			opt.modCircCall = CircfullOption::CircCallMod::ucRG;
+		else if (circCallMod == "CIRI")
+			opt.modCircCall = CircfullOption::CircCallMod::CIRI;
 		// input info
 		opt.umiClustTab = args.get<string>("-u");
 		// opt.consensusFasta = args.get<string>("-c");
@@ -256,8 +266,10 @@ namespace circfull
 		// output info
 		opt.oPath = args.get<string>("-o");
 		opt.oPrefix = args.get<string>("-p");
-		opt.circCallOutputPath = opt.oPath / (opt.oPrefix + "_ciri_call");
-		opt.circCollapsePath = opt.oPath / (opt.oPrefix + "_ciri_collapse");
+		if (opt.modCircCall == CircfullOption::CircCallMod::CIRI) {
+			opt.circCallOutputPath = opt.oPath / (opt.oPrefix + "_ciri_call");
+			opt.circCollapsePath = opt.oPath / (opt.oPrefix + "_ciri_collapse");
+		}
 		opt.spliceSignal = args.get<string>("--splice");
 		// running options
 		opt.nthread = args.get<int>("-t");
@@ -272,15 +284,6 @@ namespace circfull
 		opt.strand = true; // default to find splice motif in forward strand
 		if (opt.useBam = args.is_used("--bam"))
 			opt.bamFile = args.get<string>("--bam");
-		std::string circCallMod = args.get<string>("-m");
-		if (circCallMod == "RG")
-			opt.modCircCall = CircfullOption::CircCallMod::RG;
-		else if (circCallMod == "cRG")
-			opt.modCircCall = CircfullOption::CircCallMod::cRG;
-		else if (circCallMod == "ucRG")
-			opt.modCircCall = CircfullOption::CircCallMod::ucRG;
-		else if (circCallMod == "CIRI")
-			opt.modCircCall = CircfullOption::CircCallMod::CIRI;
 		// RG mod options
 		if (opt.modCircCall == CircfullOption::CircCallMod::RG || opt.modCircCall == CircfullOption::CircCallMod::cRG)
 		{
