@@ -53,7 +53,7 @@ void getConsensusSeq(const std::filesystem::path &strandFasta, const std::filesy
 {
 	// read sequence and generate consensus seq for each UMI clust
 	boost::asio::thread_pool pool(nthread);
-	seqan3::sequence_file_input seqIn{strandFasta};
+	seqan3::sequence_file_input<sequence_file_input_nanopore> seqIn{strandFasta};
 	int nowClust = -1, nowt, clustId;
 	std::vector<std::string> *seqs = new std::vector<std::string>();
 	std::vector<std::string> *quals = new std::vector<std::string>();

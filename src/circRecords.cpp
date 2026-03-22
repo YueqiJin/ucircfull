@@ -5,7 +5,7 @@
 namespace circfull
 {
 
-	std::string referenceStorage::getSeqByPosition(std::string chr, int start, int end)
+	std::string referenceStorage::getSeqByPosition(std::string chr, int start, int end) const
 	{
 		// check if seqs[chr] position: start : end is not empty
 		if (seqs.find(chr) == seqs.end())
@@ -13,9 +13,9 @@ namespace circfull
 			std::cout << "Error: chromosome " << chr << " not found in reference genome" << std::endl;
 			return "";
 		}
-		if (seqs[chr].size() < end)
+		if (seqs.at(chr).size() < end)
 			return "NA";
-		return seqan3ToString(seqs[chr] | seqan3::views::slice(start, end));
+		return seqan3ToString(seqs.at(chr) | seqan3::views::slice(start, end));
 	}
 
 	std::istream &operator>>(std::istream &is, GtfRecord &record)
@@ -327,12 +327,12 @@ namespace circfull
 				len += exon.second - exon.first + 1;
 		}
 
-		std::string CircRecord::getCircId()
+		std::string CircRecord::getCircId() const
 		{
 			return chr + ":" + std::to_string(start) + "-" + std::to_string(end) + ":" + strand;
 		}
 
-		std::string CircRecord::getExonsString()
+		std::string CircRecord::getExonsString() const
 		{
 			std::string ret = std::to_string(exons.begin()->first) + "-" + std::to_string(exons.begin()->second);
 			for (auto iter = exons.begin() + 1; iter != exons.end(); iter++)
@@ -340,9 +340,19 @@ namespace circfull
 			return ret;
 		}
 
-		std::string CircRecord::getTranscriptId()
+		std::string CircRecord::getTranscriptId() const
 		{
 			return getCircId() + "|" + getExonsString();
+		}
+
+		std::string FusionCircRecord::getCircId() const
+		{
+			return first.chr + "|" + std::to_string(first.start) + "|" + std::to_string(first.end) + "|" + second.chr + "|" + std::to_string(second.start) + "|" + std::to_string(second.end);
+		}
+
+		std::string FusionCircRecord::getIsoformId() const
+		{
+			return getCircId() + "|" + first.getExonsString() + "|" + std::string(1, first.strand) + "|" + second.getExonsString() + "|" + std::string(1, second.strand);
 		}
 	}
 

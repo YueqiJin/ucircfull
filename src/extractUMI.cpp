@@ -184,8 +184,11 @@ namespace circfull
 		std::filesystem::path tmpDir;
 		printTimeInfo("identify strand:");
 		// read input sequence from opt.rawFastq
-		seqan3::sequence_file_input seqFileIn{opt.rawFastq};
-		std::ofstream outStream{opt.oPath / (opt.oPrefix + "_barcode.tsv")};
+		seqan3::sequence_file_input<sequence_file_input_nanopore> seqFileIn{opt.rawFastq};
+		std::ofstream outStream;
+		if (circfull::debug) {
+			outStream.open(opt.oPath / (opt.oPrefix + "_barcode.tsv"));
+		};
 		std::ofstream umiFileOut{opt.umiFasta};
 		std::ofstream strandFileOut{opt.strandNotTrimFastq};
 		std::ranges::copy(
@@ -214,7 +217,8 @@ namespace circfull
 				)};
 				if (ret.has_value()) {
 					mt.lock();
-					outStream << std::get<0>(ret.value());
+					if (circfull::debug)
+						outStream << std::get<0>(ret.value());
 					umiFileOut << outputAsFasta(shortID, std::get<2>(ret.value()));
 					strandFileOut << "@" + shortID + "\n" + std::get<3>(ret.value()) + "\n+\n" + std::get<4>(ret.value()) + "\n";
 					keepCountSum++;
@@ -227,11 +231,19 @@ namespace circfull
 		}
 		pool.join();
 		std::cout << "discard " << discardCountSum << " reads in " << keepCountSum + discardCountSum << " reads" << std::endl;
-
-		// merge result files
+		// close stream
+		if (circfull::debug) {
+			outStream.close();
+		}
+		umiFileOut.close();
+		strandFileOut.close();
+		// trim adapters using porechop
 		printTimeInfo("trimming adapters from stranded fastq:");
 		if (trimAdaptor(opt.porechop, opt.strandNotTrimFastq, opt.strandFastq, opt.nthread))
 			return -1;
+		// clean temporary files
+		printTimeInfo("cleaning temporary files");
+		std::filesystem::remove(opt.strandNotTrimFastq);
 		printTimeInfo("finished.");
 		return 0;
 	}

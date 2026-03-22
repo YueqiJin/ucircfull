@@ -10,7 +10,7 @@ sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list.d/debian.s
 apt update
 apt install cmake make g++ gcc libboost-all-dev libseqan3-dev libseqan2-dev git unzip -y
 micromamba install -n base -c conda-forge conda-pack
-micromamba create -n ucircfull -c conda-forge -c bioconda minimap2 rust porechop seqkit samtools
+micromamba create -n ucircfull -c conda-forge -c bioconda rust porechop seqkit samtools
 micromamba run -n base conda-pack -p /opt/conda/envs/ucircfull -o /opt/env.tar
 #mkdir /venv && cd /venv
 cd /venv
@@ -43,4 +43,4 @@ apt update
 apt install -y libncurses5-dev zlib1g-dev libbz2-dev liblzma-dev libboost-all-dev libseqan3-dev libseqan2-dev
 
 %help
-Built by Yueqi Jin on 2023.09.06
+Built by Yueqi Jin on 2025.10.01

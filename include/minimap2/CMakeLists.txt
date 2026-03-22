@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.0)
 project(minimap2)
 
 # Define compiler flags and options
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Wall -O2 -Wc++-compat -fPIC")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Wall -O3 -Wc++-compat -fPIC")
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -D_DEBUG")
 set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -DNDEBUG")
 
@@ -15,7 +15,6 @@ include_directories(${CMAKE_SOURCE_DIR})
 
 # Source files
 set(SOURCES
-    main.c
     kthread.c
     kalloc.c
     misc.c
@@ -71,14 +70,18 @@ endif()
 
 
 # Create the library target
-add_library(minimap2 STATIC ${SOURCES})
+add_library(minimap2_dev STATIC ${SOURCES})
 
 # Find and link ZLIB library
 find_package(ZLIB REQUIRED)
 # Link 'pthread' automatically
 find_package(Threads REQUIRED)
-target_link_libraries(minimap2
+target_link_libraries(minimap2_dev
 	ZLIB::ZLIB
 	Threads::Threads
 	m
 )
+
+# Add minimap2 executable
+add_executable(minimap2 main.c)
+target_link_libraries(minimap2 minimap2_dev)

@@ -38,3 +38,6 @@
 /build
 /lib
 ucircfull.zip
+
+# Container files
+*.sif

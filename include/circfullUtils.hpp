@@ -5,6 +5,7 @@
 #include <set>
 #include <map>
 #include <seqan3/io/sequence_file/all.hpp>
+#include <seqan3/alphabet/quality/phred94.hpp>
 #include "degenerateBase.hpp"
 
 namespace circfull
@@ -436,3 +437,8 @@ std::vector<T> circfull::maxElements(const std::vector<T> &array, std::function<
 										   { return valueFunc(item) == maxValue; });
 	return maxElements;
 }
+
+struct sequence_file_input_nanopore : seqan3::sequence_file_input_default_traits_dna
+{
+	using quality_alphabet = seqan3::phred94;
+};

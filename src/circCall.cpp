@@ -81,6 +81,7 @@ namespace circfull
 						nowTranscriptId = it->getTranscriptId();
 					}
 				}
+				//TODO: add circRNA strand info adjustment
 				std::string circBSJLine = nowBegin->chr + "\tcircfull\tgene\t" + std::to_string(nowBegin->start) + "\t" + std::to_string(nowBegin->end) + "\t.\t" + nowBegin->strand + "\t.\tgene_id \"" + nowBegin->getCircId() + "\"; bsj \"" + std::to_string(totalCount) + "\";\n";
 				if (totalCount > 1) {
 					mt.lock();
@@ -135,8 +136,7 @@ namespace circfull
 				return 1;
 			}
 
-			if (opt.modCircCall == CircfullOption::CircCallMod::ucRG)
-			{
+			if (opt.modCircCall == CircfullOption::CircCallMod::ucRG) {
 				if (!checkFile(opt.umiClustTab))
 				{
 					std::cerr << "Error: " << opt.umiClustTab << " does not exist" << std::endl;
@@ -148,11 +148,11 @@ namespace circfull
 				std::map<std::string, std::string> umiCluster = readUMIClustInfo(opt.umiClustTab);
 
 				// scan for ccs reads
-				std::map<std::string, std::tuple<std::string, std::string, std::string>> ccsSeq = circfull::findCcsReads(opt.strandFastq, opt.circCallOutputPath, opt.nthread);
+				std::map<std::string, std::tuple<std::string, std::string, std::string>> ccsSeq = circfull::findCcsReads(opt.strandFastq, opt.oPath / (opt.oPrefix + "_ccs"), opt.nthread);
 
 				// UMI guided ccs calling
 				printTimeInfo("UMI guided ccs calling:");
-				std::map<std::string, std::string> ccsConsensus = circfull::constructCCSConsensus(ccsSeq, umiCluster, opt.nthread, opt.circCallOutputPath);
+				std::map<std::string, std::string> ccsConsensus = circfull::constructUCCSConsensus(ccsSeq, umiCluster, opt.nthread, opt.oPath);
 
 				// write consensus sequence (doubled) to file
 				opt.ccsFasta = opt.oPath / (opt.oPrefix + "_RG_pseudo.fa");
@@ -164,9 +164,23 @@ namespace circfull
 				}
 				consensusFasta.close();
 			}
-			else
-			{
-				opt.ccsFasta = opt.strandFastq;
+			if (opt.modCircCall ==  CircfullOption::CircCallMod::cRG) {
+				// read in UMI cluster file
+				printTimeInfo("Scaning candidate circRNA reads:");
+				// scan for ccs reads
+				std::map<std::string, std::tuple<std::string, std::string, std::string>> ccsSeq = circfull::findCcsReads(opt.strandFastq, opt.oPath / (opt.oPrefix + "_ccs"), opt.nthread);
+				// write consensus sequence (doubled) to file
+				opt.ccsFasta = opt.oPath / (opt.oPrefix + "_RG_pseudo.fa");
+				std::ofstream consensusFasta(opt.ccsFasta, std::ios::out);
+				for (auto &it : ccsSeq)
+				{
+					consensusFasta << ">" << it.first << std::endl;
+					consensusFasta << get<1>(it.second) << get<1>(it.second) << get<1>(it.second) << std::endl;
+				}
+				consensusFasta.close();
+			}
+			if (opt.modCircCall == CircfullOption::CircCallMod::RG) {
+					opt.ccsFasta = opt.strandFastq;
 			}
 		}
 		else
@@ -215,6 +229,11 @@ namespace circfull
 			printTimeInfo("Reading annotation file.");
 			GtfStorage gtfRecords{readGtf(opt.annotationGTF)};
 			ExonIndex<> exonBSIndex = getExonIndex(gtfRecords, errorBSLen);
+			ExonIndex<> exonFSIndex = getExonIndex(gtfRecords, errorFSLen);
+			printTimeInfo("Identify fusion circRNAs.");
+			std::vector<FusionCircRecord> fusionList = identifyFusionCirc(sameChrFusionInfo, diffChrFusionInfo, genome, exonFSIndex, gtfRecords, opt.nthread);
+			std::filesystem::path fusionOutputFile{opt.oPath / (opt.oPrefix + ".fusion.txt")};
+			outputFusionCirc(fusionList, genome, exonFSIndex, gtfRecords, fusionOutputFile);
 			printTimeInfo("filter BS signal according to annotation file.");
 			std::filesystem::path BSFilteredListFile{opt.oPath / "RG" / (opt.oPrefix + ".BS.filtered.txt")};
 			BSList = filterBS(genome, BSList, gtfRecords, exonBSIndex, BSFilteredListFile, opt.spliceSignal, opt.nthread);
@@ -223,7 +242,6 @@ namespace circfull
 			BSList = clusterBS(BSList, BSAdjustFile, opt.nthread);
 			printTimeInfo("Inferring internal structure");
 			std::filesystem::path fullStructFile{opt.oPath / "RG" / (opt.oPrefix + ".full_struct.txt")};
-			ExonIndex<> exonFSIndex = getExonIndex(gtfRecords, errorFSLen);
 			std::vector<CircRecord> circList{constructFullStruct(BSList, circCandidateInfo, genome, exonFSIndex, gtfRecords, fullStructFile, opt.nthread)};
 			std::filesystem::path adjFullStructFile{opt.oPath / "RG" / (opt.oPrefix + ".adj_full_struct.txt")};
 			circList = clustFullStruct(circList, adjFullStructFile, opt.nthread);

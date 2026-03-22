@@ -14,7 +14,6 @@ set(RS_SO "${CMAKE_CURRENT_SOURCE_DIR}/target/${TARGET_DIR}/libcccs.a")
 add_custom_target( CCCS_BUILD ALL
 	COMMENT "Compiling rs module"
 	COMMAND ${CARGO_CMD}
-	COMMAND cp ${RS_SO} ${LIBRARY_OUTPUT_PATH}
 	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
@@ -23,11 +22,10 @@ COMMAND cargo test
 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_library(cccs STATIC IMPORTED GLOBAL)
-#find_library(cccs libcccs.so PATHS ${LIBRARY_OUTPUT_PATH})
 add_dependencies(cccs CCCS_BUILD)
-set_target_properties(cccs PROPERTIES IMPORTED_LOCATION ${LIBRARY_OUTPUT_PATH}/libcccs.a)
+set_target_properties(cccs PROPERTIES IMPORTED_LOCATION ${RS_SO})
 
 install(
-	FILES ${LIBRARY_OUTPUT_PATH}/libcccs.a
+	FILES ${RS_SO}
 	TYPE LIB
 )

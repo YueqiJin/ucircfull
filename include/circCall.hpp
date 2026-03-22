@@ -41,7 +41,7 @@ namespace circfull
 	struct referenceStorage
 	{
 		std::map<std::string, seqan3::dna5_vector> seqs;
-		std::string getSeqByPosition(std::string chr, int start, int end);
+		std::string getSeqByPosition(std::string chr, int start, int end) const;
 	};
 
 	class GtfRecord
@@ -125,7 +125,7 @@ namespace circfull
 	/// @param nthread number of threads
 	/// @param outPrefix output prefix
 	/// @return map<string, string> consensus sequence: clustId->consensus sequence
-	std::map<std::string, std::string> constructCCSConsensus(std::map<std::string, std::tuple<std::string, std::string, std::string>> &ccsSeq, const std::map<std::string, std::string> &umiInfo, int nthread, std::filesystem::path outPrefix);
+	std::map<std::string, std::string> constructUCCSConsensus(std::map<std::string, std::tuple<std::string, std::string, std::string>> &ccsSeq, const std::map<std::string, std::string> &umiInfo, int nthread, std::filesystem::path outPrefix);
 
 	namespace RG
 	{
@@ -260,9 +260,20 @@ namespace circfull
 
 			// update length of circRNA
 			void updateLength();
-			std::string getCircId();
-			std::string getExonsString();
-			std::string getTranscriptId();
+			std::string getCircId() const;
+			std::string getExonsString() const;
+			std::string getTranscriptId() const;
+		};
+
+		class FusionCircRecord
+		{
+		public:
+			std::string queryId;
+			CircRecord first;
+			CircRecord second;
+
+			std::string getCircId() const;
+			std::string getIsoformId() const;
 		};
 
 		std::istream &operator>>(std::istream &in, MapRecord &record);
@@ -270,6 +281,7 @@ namespace circfull
 		std::string to_string(const MapRecord *record);
 		std::string to_string(const BSRecord *record);
 		std::string to_string(const CircRecord *record);
+		std::string to_string(const FusionCircRecord *record);
 
 		ExonIndex<std::string> getExonIndex(const GtfStorage &gtfList, const int errorLen);
 
@@ -283,9 +295,15 @@ namespace circfull
 
 		std::vector<BSRecord> clusterBS(const std::vector<BSRecord> &BSList, std::filesystem::path BSAdjustFile, int nthread);
 
+		std::vector<std::pair<int, int>> adjustExonByRef(const std::string &chr, const char strand, const std::vector<std::pair<int, int>> &origin, const ExonIndex<> &exonIndex, const GtfStorage &gtfRecords);
+
 		std::vector<CircRecord> constructFullStruct(std::vector<BSRecord> &BSList, std::vector<MapRecord> &mapList, const referenceStorage &genome, const ExonIndex<> &exonIndex, GtfStorage &gtfRecords, std::filesystem::path fullStructFile, int nthread);
 
 		std::vector<CircRecord> clustFullStruct(std::vector<CircRecord> &circList, std::filesystem::path adjFullStructFile, int nthread);
+
+		std::vector<FusionCircRecord> identifyFusionCirc(std::vector<MapRecord> &sameChrFusionInfo, std::vector<MapRecord> &diffChrFusionInfo, const referenceStorage &genome, const ExonIndex<> &exonIndex, GtfStorage &gtfRecords, int nthread);
+
+		void outputFusionCirc(std::vector<FusionCircRecord> &fusionList, const referenceStorage &genome, const ExonIndex<> &exonIndex, GtfStorage &gtfRecords, std::filesystem::path output);
 
 		std::vector<circfull::RG::CircRecord> RG(CircfullOption &opt);
 	};

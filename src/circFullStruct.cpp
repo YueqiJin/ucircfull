@@ -55,8 +55,10 @@ namespace circfull
 						for (auto & site : commonGene)
 							if (site.strand == *(toBeAdjustBSList[i].BSstrand.begin())) {
 								int dis = std::abs(site.start - toBeAdjustBSList[i].BSPos[0].first) + std::abs(site.end - toBeAdjustBSList[i].BSPos[0].second);
-								if (dis < closestDis)
+								if (dis < closestDis) {
 									closestSite = site;
+									closestDis = dis;
+								}
 							}
 						if (closestDis == __INT_MAX__)
 							return;

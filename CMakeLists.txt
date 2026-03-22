@@ -1,45 +1,50 @@
-# set the project name 
-cmake_minimum_required(VERSION 3.4)
+cmake_minimum_required(VERSION 3.16)
 
-project(ucircfull VERSION 1.0.0 LANGUAGES CXX) 
-
-# specify the C++ standard
+project(ucircfull VERSION 1.1.0 LANGUAGES CXX)
 
 include(CheckCXXCompilerFlag)
-CHECK_CXX_COMPILER_FLAG("-std=c++2a -std=c++20" COMPILER_SUPPORTS_CXX20)
-if (COMPILER_SUPPORTS_CXX20)
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++2a -std=c++20")
-else ()
-	message(STATUS "The compiler ${CMAKE_CXX_COMPILER} has no C++20 support. Please use a different C++ compiler.")
-endif ()
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
 
+if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
+	set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
 
-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(TARGET_DIR "debug")
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O1 -g")
-else ()
-    set(TARGET_DIR "release")
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fPIC")
-endif ()
+if(NOT MSVC)
+	set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O3")
+	set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
+endif()
 
-# specify the C++ standard
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED True) 
-set(CMAKE_BUILD_DIR ${PROJECT_SOURCE_DIR}/build/${TARGET_DIR})
-set(LIBRARY_OUTPUT_PATH ${CMAKE_BUILD_DIR}/lib)
-set(EXECUTABLE_OUTPUT_PATH ${CMAKE_BUILD_DIR}/bin)
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-# generate version header.
+check_cxx_compiler_flag("-std=c++23" COMPILER_SUPPORTS_CXX23)
+if(NOT COMPILER_SUPPORTS_CXX23)
+	message(FATAL_ERROR "The compiler ${CMAKE_CXX_COMPILER} does not support C++23.")
+endif()
+
+set(UCIRCFULL_GENERATED_INCLUDE_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated/include)
+file(MAKE_DIRECTORY ${UCIRCFULL_GENERATED_INCLUDE_DIR})
 
 configure_file(
 	${PROJECT_SOURCE_DIR}/include/version.hpp.in
-	${PROJECT_SOURCE_DIR}/include/version.hpp
+	${UCIRCFULL_GENERATED_INCLUDE_DIR}/version.hpp
 	@ONLY
 )
 
+if(UNIX AND NOT APPLE)
+	set(CMAKE_INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
+	set(CMAKE_BUILD_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
+	set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+endif()
+
+option(UCIRCFULL_BUNDLE_GNU_CXX_RUNTIME "Install GNU C++ runtime libraries (libstdc++, libgcc_s) for portable Linux deployment" ON)
+
 find_package(ZLIB REQUIRED)
 
-include_directories($(ZLIB_INCLUDE_DIRS))
+include_directories(${ZLIB_INCLUDE_DIRS})
 
 # import cd-hit library
 add_subdirectory(include/cdhit)
@@ -50,6 +55,7 @@ add_subdirectory(include/minimap2)
 #include dependence
 include_directories (
 	${PROJECT_SOURCE_DIR}/include
+	${UCIRCFULL_GENERATED_INCLUDE_DIR}
 	${PROJECT_SOURCE_DIR}/include/spoa/include
 	${PROJECT_SOURCE_DIR}/include/minimap2/
 )
@@ -58,6 +64,7 @@ add_library(circfullcirccall SHARED
 	src/circCall.cpp
 	src/circFindccs.cpp
 	src/circFindBsj.cpp
+	src/circFusion.cpp
 	src/circRecords.cpp
 	src/circFullStruct.cpp
 )
@@ -103,58 +110,172 @@ add_executable(ucircfull src/ucircfull.cpp)
 
 #add_dependencies(circfullalign MINIMAP2)
 target_link_libraries(circfullalign
-	${CMAKE_THREAD_LIBS_INIT}
-	minimap2
-	seqan3::seqan3
+	PRIVATE
+		Threads::Threads
+		minimap2_dev
+		seqan3::seqan3
 )
 
 target_link_libraries(circfullclust
-	${CMAKE_THREAD_LIBS_INIT}
-	cdhit
-	spoa::spoa
-	ZLIB::ZLIB
-	circfullUtils
+	PRIVATE
+		Threads::Threads
+		cdhit
+		spoa::spoa
+		ZLIB::ZLIB
+		circfullUtils
 )
 
 target_link_libraries(circfullUtils
-	${CMAKE_THREAD_LIBS_INIT}
-	circfullalign
+	PRIVATE
+		Threads::Threads
+		circfullalign
 )
 
 target_link_libraries(circfull_satcurve 
-	${CMAKE_THREAD_LIBS_INIT}
-	circfullUtils
+	PRIVATE
+		Threads::Threads
+		circfullUtils
 )
 
 target_link_libraries(circfullcirccall 
-	${CMAKE_THREAD_LIBS_INIT}
-	seqan3::seqan3
-	${SEQAN_LIBRARIES}
-	circfullUtils
-	cccs
-	circfullclust
+	PRIVATE
+		Threads::Threads
+		seqan3::seqan3
+		${SEQAN_LIBRARIES}
+		circfullUtils
+		cccs
+		circfullclust
 )
 
 target_link_libraries(circfull 
-	${CMAKE_THREAD_LIBS_INIT}
-	circfullUtils
-	circfullcirccall
-	circfullalign
-	circfullclust
-	seqan3::seqan3
+	PRIVATE
+		Threads::Threads
+		circfullUtils
+		circfullcirccall
+		circfullalign
+		circfullclust
+		seqan3::seqan3
 )
 
 target_link_libraries(ucircfull 
-	${CMAKE_THREAD_LIBS_INIT}
-	circfullUtils
-	circfull
+	PRIVATE
+		Threads::Threads
+		circfullUtils
+		circfull
+		circfullcirccall
 )
 
-# install to destination
+set(UCIRCFULL_EXPORT_NAME ucircfullTargets)
+set(UCIRCFULL_CMAKE_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR}/cmake/ucircfull)
+
 install(
-	TARGETS ucircfull circfull_satcurve circfullalign circfullclust circfullUtils circfullcirccall circfull
-	EXPORT ucircfullTargets
-	LIBRARY DESTINATION lib
-	ARCHIVE DESTINATION lib
-	RUNTIME DESTINATION bin
+	TARGETS
+		ucircfull
+		circfull_satcurve
+		circfullalign
+		circfullclust
+		circfullUtils
+		circfullcirccall
+		circfull
+		cdhit
+		spoa
+		minimap2
+	EXPORT ${UCIRCFULL_EXPORT_NAME}
+	LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+	ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+	RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+	INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/ucircfull
 )
+
+install(
+	FILES
+		${PROJECT_SOURCE_DIR}/include/align.hpp
+		${PROJECT_SOURCE_DIR}/include/circCall.hpp
+		${PROJECT_SOURCE_DIR}/include/circfullUtils.hpp
+		${PROJECT_SOURCE_DIR}/include/clust.hpp
+		${PROJECT_SOURCE_DIR}/include/degenerateBase.hpp
+		${PROJECT_SOURCE_DIR}/include/ucircfull.hpp
+	DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/ucircfull
+)
+
+install(
+	FILES ${PROJECT_SOURCE_DIR}/include/argparse/argparse.hpp
+	DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/ucircfull/argparse
+)
+
+install(
+	FILES ${UCIRCFULL_GENERATED_INCLUDE_DIR}/version.hpp
+	DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/ucircfull
+)
+
+write_basic_package_version_file(
+	${CMAKE_CURRENT_BINARY_DIR}/ucircfullConfigVersion.cmake
+	VERSION ${PROJECT_VERSION}
+	COMPATIBILITY SameMajorVersion
+)
+
+configure_package_config_file(
+	${CMAKE_CURRENT_SOURCE_DIR}/cmake/ucircfullConfig.cmake.in
+	${CMAKE_CURRENT_BINARY_DIR}/ucircfullConfig.cmake
+	INSTALL_DESTINATION ${UCIRCFULL_CMAKE_INSTALL_DIR}
+)
+
+install(
+	EXPORT ${UCIRCFULL_EXPORT_NAME}
+	NAMESPACE ucircfull::
+	DESTINATION ${UCIRCFULL_CMAKE_INSTALL_DIR}
+)
+
+install(
+	FILES
+		${CMAKE_CURRENT_BINARY_DIR}/ucircfullConfig.cmake
+		${CMAKE_CURRENT_BINARY_DIR}/ucircfullConfigVersion.cmake
+	DESTINATION ${UCIRCFULL_CMAKE_INSTALL_DIR}
+)
+
+if(UNIX AND NOT APPLE AND UCIRCFULL_BUNDLE_GNU_CXX_RUNTIME)
+	execute_process(
+		COMMAND ${CMAKE_CXX_COMPILER} -print-file-name=libstdc++.so.6
+		OUTPUT_VARIABLE UCIRCFULL_LIBSTDCXX
+		OUTPUT_STRIP_TRAILING_WHITESPACE
+	)
+	execute_process(
+		COMMAND ${CMAKE_CXX_COMPILER} -print-file-name=libgcc_s.so.1
+		OUTPUT_VARIABLE UCIRCFULL_LIBGCC
+		OUTPUT_STRIP_TRAILING_WHITESPACE
+	)
+
+	if(EXISTS "${UCIRCFULL_LIBSTDCXX}")
+		file(REAL_PATH "${UCIRCFULL_LIBSTDCXX}" UCIRCFULL_LIBSTDCXX_REAL)
+		install(
+			FILES "${UCIRCFULL_LIBSTDCXX_REAL}"
+			DESTINATION ${CMAKE_INSTALL_LIBDIR}
+			RENAME libstdc++.so.6
+		)
+	else()
+		message(WARNING "UCIRCFULL_BUNDLE_GNU_CXX_RUNTIME is ON, but libstdc++.so.6 was not found via compiler path lookup.")
+	endif()
+
+	if(EXISTS "${UCIRCFULL_LIBGCC}")
+		file(REAL_PATH "${UCIRCFULL_LIBGCC}" UCIRCFULL_LIBGCC_REAL)
+		install(
+			FILES "${UCIRCFULL_LIBGCC_REAL}"
+			DESTINATION ${CMAKE_INSTALL_LIBDIR}
+			RENAME libgcc_s.so.1
+		)
+	else()
+		message(WARNING "UCIRCFULL_BUNDLE_GNU_CXX_RUNTIME is ON, but libgcc_s.so.1 was not found via compiler path lookup.")
+	endif()
+endif()
+
+set(CPACK_PACKAGE_NAME "ucircfull")
+set(CPACK_PACKAGE_VENDOR "yangence")
+set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+set(CPACK_SOURCE_IGNORE_FILES "/build/;/.git/;\\\\.vscode/;\\\\.idea/")
+if(WIN32)
+	set(CPACK_GENERATOR "ZIP")
+else()
+	set(CPACK_GENERATOR "TGZ")
+endif()
+include(CPack)

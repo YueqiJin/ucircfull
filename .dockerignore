@@ -1,0 +1,15 @@
+.git
+.gitignore
+build
+cmake-build-*
+**/CMakeFiles
+**/CMakeCache.txt
+**/target
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+*.sif
+*.zip

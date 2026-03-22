@@ -14,11 +14,8 @@
 #include "minimap2/mmpriv.h"
 #include "minimap2/bseq.h"
 
-using namespace std;
-namespace fs = filesystem;
-
-AlignPatternResult::AlignPatternResult(string seq, int score, int seq1Start, int seq1End, int seq2Start, int seq2End) : mappedString(seq), score(score), seq1Site(seq1Start, seq1End), seq2Site(seq2Start, seq2End) {}
-AlignPatternResult::AlignPatternResult(string seq, string qual, int score, int seq1Start, int seq1End, int seq2Start, int seq2End) : mappedString(seq), mappedQual(qual), score(score), seq1Site(seq1Start, seq1End), seq2Site(seq2Start, seq2End) {}
+AlignPatternResult::AlignPatternResult(std::string seq, int score, int seq1Start, int seq1End, int seq2Start, int seq2End) : mappedString(seq), score(score), seq1Site(seq1Start, seq1End), seq2Site(seq2Start, seq2End) {}
+AlignPatternResult::AlignPatternResult(std::string seq, std::string qual, int score, int seq1Start, int seq1End, int seq2Start, int seq2End) : mappedString(seq), mappedQual(qual), score(score), seq1Site(seq1Start, seq1End), seq2Site(seq2Start, seq2End) {}
 AlignPatternResult::AlignPatternResult() {}
 
 AlignOptions::AlignOptions(int matchScore, int mismatchScore, int openScore, int extendScore) : matchScore(matchScore), mismatchScore(mismatchScore), openScore(openScore), extendScore(extendScore), useScoreMat(false) {}
@@ -74,7 +71,7 @@ void degenerateAlign(const DegenerateBaseVector &seqNum1, const DegenerateBaseVe
 			}
 			// dual with match
 			lastScore[3] += ((seqNum1[i - 1] & seqNum2[j - 1]) ? matchScore : mismatchScore);
-			maxPath = max_element(lastScore, lastScore + 4) - lastScore;
+			maxPath = std::max_element(lastScore, lastScore + 4) - lastScore;
 			*(short *)(path + i * mat2 + j) = maxPath;
 			*(int *)(scoreMat + i * mat2 + j) = lastScore[maxPath];
 		}
@@ -120,7 +117,7 @@ void degenerateAlign(const DegenerateBaseVector &seqNum1, const DegenerateBaseVe
 			}
 			// dual with match
 			lastScore[3] += aligner.getAlignScore(seqNum1[i - 1], seqNum2[j - 1]);
-			maxPath = max_element(lastScore, lastScore + 4) - lastScore;
+			maxPath = std::max_element(lastScore, lastScore + 4) - lastScore;
 			*(short *)(path + i * mat2 + j) = maxPath;
 			*(int *)(scoreMat + i * mat2 + j) = lastScore[maxPath];
 		}
@@ -142,7 +139,7 @@ void findPath(int mat1, int mat2, int *scoreMat, short *path, bool seq1RightAlig
 		newX = nowX - ((*(short *)(path + nowX * len2 + nowY) == 2) ? 0 : 1), newY = nowY - ((*(short *)(path + nowX * len2 + nowY) == 1) ? 0 : 1);
 		nowX = newX, nowY = newY;
 	}
-	cout << maxScore << " " << nowX + 1 << " " << startX + 1 << " " << nowY + 1 << " " << startY + 1 << endl;
+	std::cout << maxScore << " " << nowX + 1 << " " << startX + 1 << " " << nowY + 1 << " " << startY + 1 << std::endl;
 }
 
 AlignPatternResult matchSeq(const DegenerateBaseVector &query, const DegenerateBaseVector &pattern, int *scoreMat, short *path, int len1, int len2, bool seq1RightAlign, bool seq2RightAlign, bool completeN)
@@ -156,7 +153,7 @@ AlignPatternResult matchSeq(const DegenerateBaseVector &query, const DegenerateB
 				maxScore = *(int *)(scoreMat + i * len2 + j), startX = i, startY = j;
 		}
 	int nowX = startX, nowY = startY, newX, newY;
-	string ret = "";
+	std::string ret = "";
 	while (*(short *)(path + nowX * len2 + nowY))
 	{
 		switch (*(short *)(path + nowX * len2 + nowY))
@@ -179,11 +176,11 @@ AlignPatternResult matchSeq(const DegenerateBaseVector &query, const DegenerateB
 		}
 	}
 	ret += "\0";
-	reverse(ret.begin(), ret.end());
+	std::reverse(ret.begin(), ret.end());
 	return AlignPatternResult(ret, maxScore, nowX + 1, startX + 1, nowY + 1, startY + 1);
 }
 
-AlignPatternResult matchSeq(const DegenerateBaseVector &query, const string &qual, const DegenerateBaseVector &pattern, int *scoreMat, short *path, int len1, int len2, bool seq1RightAlign, bool seq2RightAlign, bool completeN)
+AlignPatternResult matchSeq(const DegenerateBaseVector &query, const std::string &qual, const DegenerateBaseVector &pattern, int *scoreMat, short *path, int len1, int len2, bool seq1RightAlign, bool seq2RightAlign, bool completeN)
 {
 	len1++, len2++;
 	int maxScore = INT_MIN, startX, startY;
@@ -194,7 +191,7 @@ AlignPatternResult matchSeq(const DegenerateBaseVector &query, const string &qua
 				maxScore = *(int *)(scoreMat + i * len2 + j), startX = i, startY = j;
 		}
 	int nowX = startX, nowY = startY, newX, newY;
-	string retSeq = "", retQual = "";
+	std::string retSeq = "", retQual = "";
 	while (*(short *)(path + nowX * len2 + nowY))
 	{
 		switch (*(short *)(path + nowX * len2 + nowY))
@@ -221,34 +218,35 @@ AlignPatternResult matchSeq(const DegenerateBaseVector &query, const string &qua
 	}
 	retSeq += "\0";
 	retQual += "\0";
-	reverse(retSeq.begin(), retSeq.end());
-	reverse(retQual.begin(), retQual.end());
+	std::reverse(retSeq.begin(), retSeq.end());
+	std::reverse(retQual.begin(), retQual.end());
 	return AlignPatternResult(retSeq, retQual, maxScore, nowX + 1, startX + 1, nowY + 1, startY + 1);
 }
 
-int minimap2Align(fs::path fastq, fs::path genome, fs::path sam, string minimap2, int thread, bool strand, int k, float p, bool quiet)
+int minimap2Align(std::filesystem::path fastq, std::filesystem::path genome, std::filesystem::path sam, std::string minimap2, int thread, bool strand, int k, float p, bool quiet)
 {
-	string cmdLine;
+	std::string cmdLine;
 	if (strand)
-		cmdLine = minimap2 + " -ax splice -uf -k" + to_string(k) + " -p " + to_string(p) + " -t " + to_string(thread) + " " + genome.string() + " " + fastq.string() + " > " + sam.string() + (quiet ? " 2>/dev/null" : "");
+		cmdLine = minimap2 + " -ax splice -uf -k" + std::to_string(k) + " -p " + std::to_string(p) + " -t " + std::to_string(thread) + " " + genome.string() + " " + fastq.string() + " > " + sam.string() + (quiet ? " 2>/dev/null" : "");
 	else
-		cmdLine = minimap2 + " -ax splice -k" + to_string(k) + " -p " + to_string(p) + " -t " + to_string(thread) + " " + genome.string() + " " + fastq.string() + " > " + sam.string() + (quiet ? " 2>/dev/null" : "");
+		cmdLine = minimap2 + " -ax splice -k" + std::to_string(k) + " -p " + std::to_string(p) + " -t " + std::to_string(thread) + " " + genome.string() + " " + fastq.string() + " > " + sam.string() + (quiet ? " 2>/dev/null" : "");
+	std::cout << "Aligning reads to genome via minimap2: " << cmdLine << std::endl;
 	return system(cmdLine.c_str());
 }
 
-int sam2bam(fs::path sam, fs::path bam, string samtools, int thread)
+int sam2bam(std::filesystem::path sam, std::filesystem::path bam, std::string samtools, int thread)
 {
-	string cmdLine = samtools + " sort -@ " + to_string(thread) + " " + sam.string() + " -o " + bam.string();
+	std::string cmdLine = samtools + " sort -@ " + std::to_string(thread) + " " + sam.string() + " -o " + bam.string();
 	return system(cmdLine.c_str());
 }
 
-int bamIndex(fs::path bam, string samtools)
+int bamIndex(std::filesystem::path bam, std::string samtools)
 {
-	string cmdLine = samtools + " index " + bam.string();
+	std::string cmdLine = samtools + " index " + bam.string();
 	return system(cmdLine.c_str());
 }
 
-mpAligner::mpAligner(string &seq, int k, bool splice, bool uf)
+mpAligner::mpAligner(std::string &seq, int k, bool splice, bool uf)
 {
 	mm_set_opt(NULL, &idxOpt, &mapOpt);
 	if (splice)
@@ -279,7 +277,7 @@ mpAligner::~mpAligner()
 	mm_idx_destroy(idx);
 }
 
-mm_reg1_t *mpAligner::map(string &seq, int *nRegs)
+mm_reg1_t *mpAligner::map(std::string &seq, int *nRegs)
 {
 	mm_tbuf_t *tBuf = mm_tbuf_init();
 	mm_reg1_t *ret = mm_map(idx, seq.length(), seq.c_str(), nRegs, tBuf, &mapOpt, 0);

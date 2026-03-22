@@ -187,7 +187,7 @@ const AlignOptions defaultAlignOption(true, NULL, NULL, -10, -4);
 /// @param p minimizer chain drop ratio
 /// @param quiet true if quiet mode
 /// @return 0 if success
-int minimap2Align(std::filesystem::path fastq, std::filesystem::path genome, std::filesystem::path sam, std::string minimap2, int thread, bool strand, int k = 15, float p = 0.5, bool quiet = false);
+int minimap2Align(std::filesystem::path fastq, std::filesystem::path genome, std::filesystem::path sam, std::string minimap2, int thread, bool strand, int k = 14, float p = 0.5, bool quiet = false);
 // int minimap2Realign(seqan3::dna5_vector readSeq, seqan3::dna5_vector refSeq, std::filesystem::path sam, string minimap2, int thread);
 
 /// @brief convert sam to bam

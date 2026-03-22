@@ -6,14 +6,22 @@ The ucircfull package is a UMI-guided tool for identifying and quantifying circR
 
 ## Installation
 
+### Install ucircfull binary release:
+
+```bash
+wget https://github.com/yangence/ucircfull/releases/download/v1.1.0/ucircfull-1.1.0.tar.gz
+tar -xzf ucircfull-1.1.0.tar.gz
+/path/to/ucircfull-1.1.0/bin/ucircfull --help
+```
+
 ### Install ucircfull from source code:
 
 #### Dependencies:
 
 - cmake >= 3.4
 - make
-- g++ >= 11.0
-- gcc >= 11.0
+- g++ with C++23 support (GCC >= 13 recommended)
+- gcc with C++23 support (GCC >= 13 recommended)
 - libboost-all-dev
 - libseqan3-dev >= 3.4.0
 - libseqan2-dev
@@ -28,15 +36,23 @@ The ucircfull package is a UMI-guided tool for identifying and quantifying circR
 ```bash
 git clone https://github.com/yangence/ucircfull.git
 cd ucircfull
-mkdir build & cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j
 ```
 
-### Install ucircfull from apptainer:
+#### Install ucircfull to a deployment prefix:
 
 ```bash
-wget https://github.com/yangence/ucircfull/releases/download/v1.0.0/ucircfull-1.0.0.sif
+cmake --install build --prefix /opt/ucircfull
+```
+
+This installs executables to `/opt/ucircfull/bin` and shared libraries to `/opt/ucircfull/lib`.
+
+### Run ucircfull in apptainer:
+
+```bash
+wget https://github.com/yangence/ucircfull/releases/download/v1.1.0/ucircfull-1.1.0.sif
+apptainer exec /path/to/ucircfull-1.1.0.sif ucircfull --help
 ```
 
 ## Required files
@@ -71,7 +87,7 @@ Subcommands:
 ```bash
 Usage: ucircfull extract_umi [--help] [--version] --input FQ --anchorx SEQ --umi SEQ [--noumi] --outdir DIR --prefix PREFIX --thread INT [--seqkit PATH] [--porechop PATH]
 
-Extract UMI sequence and identify strand from circFL-seq2 raw fastq
+Extract UMI sequence and identify strand from ucircFL-seq raw fastq
 
 Optional arguments:
   -h, --help            shows help message and exits
@@ -85,6 +101,7 @@ Optional arguments:
   -t, --thread INT      number of threads used. [default: 4]
   --seqkit PATH         path to seqkit. [default: "seqkit"]
   --porechop PATH       path to porechop. [default: "porechop"]
+  --debug               enable debug output.
 ```
 
 For ucircFL-seq data in default library preparation data (`$rawfastq`), run:
@@ -136,7 +153,8 @@ circRNA identification.
 Optional arguments:
   -h, --help            shows help message and exits
   -v, --version         prints version information and exits
-  -m, --mode STR        circRNA calling mode. (RG, ucRG) [required]
+  -m, --mode STR        circRNA calling mode. (RG, ucRG, cRG) [required]
+  -sn, --notstranded    find splicing signal in both strand. [default: false]
   -i, --input FQ        stranded fastq file. [required]
   --bam BAM             mapped bam file as input.
   -r, --ref REF         CIRI-long reference directory. [required]
@@ -158,3 +176,4 @@ ucircfull circ_call -m ucRG -i ${sample}_strand.fastq -r $genome -a $gtfFile -u 
 #### output:
 
 - `$sample`.circ.gtf: identification and quantification results of circRNAs
+- `$sample`.fusion.txt: detected fusion circRNAs

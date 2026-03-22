@@ -65,7 +65,7 @@ std::map<std::string, std::tuple<std::string, std::string, std::string>> circful
 	// write ccs reads to outPrefix_ccs.fa using find_ccs function
 	// return map<string, tuple<string, string, string>>: readId -> (segment, ccs, rawSeq)
 	std::map<std::string, std::tuple<std::string, std::string, std::string>> ret;
-	seqan3::sequence_file_input seqIn{inFile};
+	seqan3::sequence_file_input<sequence_file_input_nanopore> seqIn{inFile};
 	boost::timer::progress_display dp(circfull::getFileNrow(inFile, nthread) / 4);
 	boost::asio::thread_pool pool(nthread);
 	std::mutex mt;
@@ -112,7 +112,7 @@ std::vector<std::string> getSegments(const std::string &segment, const std::stri
 	return ret;
 }
 
-std::map<std::string, std::string> circfull::constructCCSConsensus(std::map<std::string, std::tuple<std::string, std::string, std::string>> &ccsSeq, const std::map<std::string, std::string> &umiInfo, int nthread, std::filesystem::path outPrefix)
+std::map<std::string, std::string> circfull::constructUCCSConsensus(std::map<std::string, std::tuple<std::string, std::string, std::string>> &ccsSeq, const std::map<std::string, std::string> &umiInfo, int nthread, std::filesystem::path outPrefix)
 {
 	// construct consensus sequence from ccsSeq
 	// write consensus sequence to outPrefix_cons.fa

@@ -226,6 +226,7 @@ namespace circfull
 		// running options
 		opt.nthread = args.get<int>("-t");
 		opt.porechop = args.get<string>("--porechop");
+		debug = args.get<bool>("--debug");
 	}
 
 	void applyClustOption(CircfullOption &opt, const argparse::ArgumentParser &args)
@@ -280,8 +281,8 @@ namespace circfull
 		opt.strandFastq = args.get<string>("-i");
 		debug = args.get<bool>("--debug");
 		// circ call options
-		// opt.strand = !(args.get<bool>("-sn"));
-		opt.strand = true; // default to find splice motif in forward strand
+		opt.strand = !(args.is_used("-sn"));
+		// opt.strand = true; // default to find splice motif in forward strand
 		if (opt.useBam = args.is_used("--bam"))
 			opt.bamFile = args.get<string>("--bam");
 		// RG mod options
@@ -376,6 +377,10 @@ namespace circfull
 			.metavar("PATH")
 			.default_value(string("porechop"))
 			.help("path to porechop.");
+		extract_umi_command.add_argument("--debug")
+			.default_value(false)
+			.help("enable debug output.")
+			.implicit_value(true);
 
 		argparse::ArgumentParser clust_umi_command{"clust_umi"};
 		clust_umi_command.add_description("UMI clusting guided consensus generation.");
@@ -417,12 +422,10 @@ namespace circfull
 			.metavar("STR")
 			.required()
 			//.help("circRNA calling mode. (RG, ucRG, CIRI)");
-			.help("circRNA calling mode. (RG, ucRG)");
-		/*
-			circ_call_command.add_argument("-sn", "--notstranded")
-				.default_value(false)
-				.help("stranded mode.");
-		*/
+			.help("circRNA calling mode. (RG, cRG, ucRG)");
+		circ_call_command.add_argument("-sn", "--notstranded")
+			.default_value(false)
+			.help("find splicing signal in both strand.");
 		circ_call_command.add_argument("-i", "--input")
 			.metavar("FQ")
 			.required()

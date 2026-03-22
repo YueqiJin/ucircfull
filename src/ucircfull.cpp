@@ -30,6 +30,8 @@ int main(int argc, char **argv)
 	case circfull::CircfullOption::mod::CIRC_FILT:
 		return circfull::filterCircCand(opt);
 		break;
+	case circfull::CircfullOption::mod::CIRCFULL:
+		return circfull_pipeline(opt);
 	}
 	return 0;
 }

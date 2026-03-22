@@ -7,6 +7,8 @@
 #include <utility>
 #include <numeric>
 #include <mutex>
+#include <thread>
+#include <atomic>
 #include <boost/asio/thread_pool.hpp>
 #include <boost/asio/post.hpp>
 #include <boost/timer/progress_display.hpp>
@@ -25,7 +27,7 @@ namespace circfull
 		seqan3::dna5_vector *seqs;
 		BSMotifIndex BSMotifList;
 
-		MapRecord parseExon(std::filesystem::path output, referenceStorage &genome, const seqan3Record &record)
+		MapRecord parseExon(const std::filesystem::path &output, referenceStorage &genome, const seqan3Record &record)
 		{
 			int refBegin = record.refBegin;
 			bool head = true;
@@ -86,20 +88,51 @@ namespace circfull
 				seqan3::format_bam{},
 				seqan3::fields<seqan3::field::header_ptr, seqan3::field::id, seqan3::field::flag, seqan3::field::cigar, seqan3::field::ref_id, seqan3::field::ref_offset>{}};
 			auto refName = &mapBam.header().ref_ids();
-			boost::asio::thread_pool tp(nthread);
-			std::mutex mt;
+			std::vector<seqan3Record> workRecords;
 			for (auto &&record : mapBam)
 			{
 				if (static_cast<bool>(record.flag() & seqan3::sam_flag::unmapped) || static_cast<bool>(record.flag() & seqan3::sam_flag::secondary_alignment))
 					continue;
-				boost::asio::post(tp, [&output, &genome, &refName, &ret, &mt, record]
-								  {
-					MapRecord res = parseExon(output, genome, seqan3Record(record.reference_position().value(), record.id(), (*refName)[record.reference_id().value()],	record.cigar_sequence(), record.flag()));
-					mt.lock();
-					ret.push_back(res);
-					mt.unlock(); });
+				workRecords.emplace_back(record.reference_position().value(), record.id(), (*refName)[record.reference_id().value()], record.cigar_sequence(), record.flag());
 			}
-			tp.join();
+
+			ret.reserve(workRecords.size());
+			if (workRecords.empty())
+				return ret;
+
+			if (nthread <= 1)
+			{
+				for (const auto &record : workRecords)
+					ret.emplace_back(parseExon(output, genome, record));
+				return ret;
+			}
+
+			std::atomic_size_t nextIdx{0};
+			std::mutex mergeMutex;
+			std::vector<std::thread> workers;
+			workers.reserve(nthread);
+			for (int tid = 0; tid < nthread; tid++)
+			{
+				workers.emplace_back([&output, &genome, &workRecords, &ret, &nextIdx, &mergeMutex, nthread]()
+								 {
+					std::vector<MapRecord> localResults;
+					localResults.reserve(workRecords.size() / nthread + 1);
+					while (true)
+					{
+						size_t idx = nextIdx.fetch_add(1, std::memory_order_relaxed);
+						if (idx >= workRecords.size())
+							break;
+						localResults.emplace_back(parseExon(output, genome, workRecords[idx]));
+					}
+					if (!localResults.empty())
+					{
+						std::lock_guard<std::mutex> lock(mergeMutex);
+						ret.insert(ret.end(), std::make_move_iterator(localResults.begin()), std::make_move_iterator(localResults.end()));
+					}
+				 });
+			}
+			for (auto &worker : workers)
+				worker.join();
 			return ret;
 		}
 
@@ -170,14 +203,14 @@ namespace circfull
 					if ((iter->exonLength) > (r1->exonLength))
 						r1 = iter;
 				// check if mostly records overlap with r1->normal circRNA candidate
-				int *overlap = new int[end - begin];
+				std::vector<int> overlap(end - begin);
 				for (MapRecordIter iter = begin; iter != end; iter++)
 					overlap[iter - begin] = ((iter->refStart) < (r1->refEnd) && (r1->refStart) < (iter->refEnd)) ? 1 : 0;
-				if (std::accumulate(overlap, overlap + (end - begin), 0) > (end - begin - 2))
+				if (std::accumulate(overlap.begin(), overlap.end(), 0) > (end - begin - 2))
 					return {"sameChrCandidate", -1}; // type 'N'
 				// check if have only two mapped sites and switch for each->sameChrFusion
 				for (int i = 1; i < (end - begin); i++)
-					if (overlap[i] ^ overlap[i - 1] == 0)
+					if ((overlap[i] ^ overlap[i - 1]) == 0)
 					{ // find no switch
 						auto [type, rowId]{readRemapRef(begin, end, genome)};
 						if (type)
@@ -271,20 +304,43 @@ namespace circfull
 			std::map<std::string, std::set<char>> chrStrandSet;
 			for (MapRecordIter iter = begin; iter != end; iter++)
 				chrSet.insert(iter->chr), chrStrandSet[iter->chr].insert(iter->strand);
-			int chrCount = chrSet.size();
-			std::string chrs[2]{*(chrSet.begin()), *(chrSet.rbegin())};
-			if (begin->chr != chrs[0])
-				swap(chrs[0], chrs[1]);
+			std::string chrs[2]{begin->chr, ""};
+			for (const auto &chr : chrSet)
+				if (chr != chrs[0])
+					chrs[1] = chr;
 			// in same chromosome but different strand
 			if (chrStrandSet[chrs[0]].size() > 1 || chrStrandSet[chrs[1]].size() > 1)
 				return {"twoChrsNotCandidate", -1}; // type 'U'
-			unsigned int targetNum = 0;
 			if (end - begin >= 4)
 			{
-				for (MapRecordIter iter = begin; iter != end; iter++, targetNum ^= 1)
-					if (iter->chr != chrs[0])
-						return {"twoChrsFusionLowConf", -1}; // type "FC1"
-				return {"twoChrsFusion", -1};				 // type "F1"
+				std::vector<int> chrCode;
+				chrCode.reserve(end - begin);
+				for (MapRecordIter iter = begin; iter != end; iter++)
+					chrCode.push_back(iter->chr == chrs[0] ? 0 : 1);
+				std::vector<int> targetNum{0, 1};
+				for (int i = 0; i < (end - begin); i++)
+				{
+					targetNum.push_back(0);
+					targetNum.push_back(1);
+				}
+				const int startOffset = chrCode[0];
+				bool isAlternating = true;
+				for (int i = 0; i < (end - begin); i++)
+					if (targetNum[startOffset + i] != chrCode[i])
+					{
+						isAlternating = false;
+						break;
+					}
+				if (isAlternating &&
+					((begin + 2)->queryStart - begin->queryEnd) > 40 &&
+					((begin + 3)->queryStart - (begin + 1)->queryEnd) > 40 &&
+					((begin + 1)->queryEnd - begin->queryEnd) > 40 &&
+					((begin + 2)->queryEnd - (begin + 1)->queryEnd) > 40 &&
+					((begin + 3)->queryEnd - (begin + 2)->queryEnd) > 40 &&
+					((begin + 1)->queryStart - begin->queryEnd) > -40 &&
+					((begin + 2)->queryStart - (begin + 1)->queryEnd) > -40 &&
+					((begin + 3)->queryStart - (begin + 2)->queryEnd) > -40)
+					return {"twoChrsFusion", -1}; // type "F1"
 			}
 			return {"twoChrsFusionLowConf", -1}; // type "FC1"
 		}
@@ -414,7 +470,7 @@ namespace circfull
 			}
 			// mapInfoFile.close();
 			std::sort(records.begin(), records.end());
-			seqan3::sequence_file_input fastqIn{fastq};
+			seqan3::sequence_file_input<sequence_file_input_nanopore> fastqIn{fastq};
 			seqs = new seqan3::dna5_vector[seqCount];
 			std::string tmpId;
 			for (auto &&record : fastqIn)
