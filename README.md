@@ -51,8 +51,8 @@ This installs executables to `/opt/ucircfull/bin` and shared libraries to `/opt/
 ### Run ucircfull in apptainer:
 
 ```bash
-wget https://github.com/yangence/ucircfull/releases/download/v1.1.0/ucircfull-1.1.0.sif
-apptainer exec /path/to/ucircfull-1.1.0.sif ucircfull --help
+apptainer pull docker://jinyueqi/ucircfull
+apptainer exec /path/to/ucircfull-latest.sif ucircfull --help
 ```
 
 ## Required files
