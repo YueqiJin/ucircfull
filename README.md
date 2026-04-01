@@ -1,6 +1,8 @@
-# ucircfull: a UMI-guided tool to identify and quantify circRNAs from ucircFL-seq data
+<p align="center">
+  <img src="logo.png" alt="ucircfull logo" width="90%" />
+</p>
 
-## Introduction
+## About
 
 The ucircfull package is a UMI-guided tool for identifying and quantifying circRNAs from UMI-tagged full-length circRNA sequencing (ucircFL-seq) data. It is designed to handle the challenges of low read depth and high sequencing error rates in ucircFL-seq data, and to provide accurate quantification of circRNA abundance.
 
@@ -9,9 +11,9 @@ The ucircfull package is a UMI-guided tool for identifying and quantifying circR
 ### Install ucircfull binary release:
 
 ```bash
-wget https://github.com/yangence/ucircfull/releases/download/v1.1.0/ucircfull-1.1.0.tar.gz
-tar -xzf ucircfull-1.1.0.tar.gz
-/path/to/ucircfull-1.1.0/bin/ucircfull --help
+wget https://github.com/YueqiJin/ucircfull/releases/download/v1.1.0/ucircfull-1.1.0-Linux.tar.gz
+tar -xzf ucircfull-1.1.0-Linux.tar.gz
+/path/to/ucircfull-1.1.0-Linux/bin/ucircfull --help
 ```
 
 ### Install ucircfull from source code:
