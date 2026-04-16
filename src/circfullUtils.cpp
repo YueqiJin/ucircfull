@@ -267,7 +267,8 @@ namespace circfull
 		// output info
 		opt.oPath = args.get<string>("-o");
 		opt.oPrefix = args.get<string>("-p");
-		if (opt.modCircCall == CircfullOption::CircCallMod::CIRI) {
+		if (opt.modCircCall == CircfullOption::CircCallMod::CIRI)
+		{
 			opt.circCallOutputPath = opt.oPath / (opt.oPrefix + "_ciri_call");
 			opt.circCollapsePath = opt.oPath / (opt.oPrefix + "_ciri_collapse");
 		}
@@ -453,7 +454,7 @@ namespace circfull
 			.metavar("MOTIF")
 			.required()
 			.default_value(string("AGGT,AGGC,ACAT,ACGT,AGAT"))
-			.help("output directory.");
+			.help("splice motifs.");
 		circ_call_command.add_argument("-o", "--outdir")
 			.metavar("DIR")
 			.required()

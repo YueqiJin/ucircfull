@@ -162,7 +162,7 @@ Optional arguments:
   -r, --ref REF         CIRI-long reference directory. [required]
   -a, --anno GTF        reference annotation GTF file. [required]
   -u, --umi CLSTR       umi clust results file. [default: "-"]
-  --splice MOTIF        output directory. [default: "AGGT,AGGC,ACAT,ACGT,AGAT"]
+  --splice MOTIF        splice motifs. [default: "AGGT,AGGC,ACAT,ACGT,AGAT"]
   -o, --outdir DIR      output directory. [default: "."]
   -p, --prefix PREFIX   output prefix. [default: "circFL"]
   -t, --thread INT      number of threads used. [default: 4]
