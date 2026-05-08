@@ -217,7 +217,7 @@ Field meanings:
 - `transcript_id`: isoform ID in the format `chr:start-end:strand|exon1_start-exon1_end,exon2_start-exon2_end,...`
 - `bsj` on `BSJ` records: total number of supporting reads summed across all isoforms at the BSJ locus
 - `bsj` on `transcript` records: number of supporting reads for that isoform
-- `circ_type`: CIRI2-compatible classification (`exon`, `intron`, or `intergenic_region`)
+- `circ_type`: circRNA classification (`exon`, `intron`, or `intergenic_region`)
 - `host_gene_id`: best-matching host gene identifier from the annotation
 - `host_gene_name`: gene symbol of the host gene
 - `uniform_id`: standardized circRNA name following the proposed naming scheme; includes exon composition, splice-site variants (L/S), retained introns (RI), novel exons (NE), and an ordered `.N` suffix per distinct BSJ site (e.g. `circAKT3(2,3).1`, `circMCU(2,L3).2`)
