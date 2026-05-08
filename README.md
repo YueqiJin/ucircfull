@@ -11,9 +11,9 @@ The ucircfull package is a UMI-guided tool for identifying and quantifying circR
 ### Install ucircfull binary release:
 
 ```bash
-wget https://github.com/YueqiJin/ucircfull/releases/download/v1.1.0/ucircfull-1.1.0-Linux.tar.gz
-tar -xzf ucircfull-1.1.0-Linux.tar.gz
-/path/to/ucircfull-1.1.0-Linux/bin/ucircfull --help
+wget https://github.com/YueqiJin/ucircfull/releases/download/v1.1.2/ucircfull-1.1.2-Linux.tar.gz
+tar -xzf ucircfull-1.1.2-Linux.tar.gz
+/path/to/ucircfull-1.1.2-Linux/bin/ucircfull --help
 ```
 
 ### Install ucircfull from source code:
