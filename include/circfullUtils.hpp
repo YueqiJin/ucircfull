@@ -71,7 +71,7 @@ namespace circfull
 
 		// circRNA calling and filtering options
 		std::string spliceSignal;
-		int circNumThres;
+		int circNumThres = 2;
 
 		// circfull2 processes files
 		std::filesystem::path umiFasta;

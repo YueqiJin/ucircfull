@@ -282,6 +282,7 @@ namespace circfull
 		opt.strandFastq = args.get<string>("-i");
 		debug = args.get<bool>("--debug");
 		// circ call options
+		opt.circNumThres = args.get<int>("--threshold");
 		opt.strand = !(args.is_used("-sn"));
 		// opt.strand = true; // default to find splice motif in forward strand
 		if (opt.useBam = args.is_used("--bam"))
@@ -313,7 +314,7 @@ namespace circfull
 			opt.circCollapsePath = opt.oPath / (opt.oPrefix + "_ciri_collapse");
 			opt.circCandFile = opt.oPath / (opt.oPrefix + "_circ_cand.tsv");
 			// filter options
-			opt.circNumThres = args.get<int>("-n");
+		opt.circNumThres = args.get<int>("--threshold");
 			// running options
 			opt.nthread = args.get<int>("-t");
 		}
@@ -465,6 +466,11 @@ namespace circfull
 			.required()
 			.default_value(string("circFL"))
 			.help("output prefix.");
+		circ_call_command.add_argument("--threshold")
+			.metavar("INT")
+			.default_value(2)
+			.help("minimum supporting reads for a circRNA transcript.")
+			.scan<'i', int>();
 		circ_call_command.add_argument("-t", "--thread")
 			.metavar("INT")
 			.required()

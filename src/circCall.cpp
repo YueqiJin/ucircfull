@@ -53,7 +53,7 @@ namespace circfull
 		std::mutex mt;
 		while (nowEnd != circLists.end())
 		{
-			// for circRNA BSJ (gene)
+			// for circRNA BSJ
 			while (nowEnd != circLists.end() && nowEnd->getCircId() == nowCircId)
 				nowEnd++;
 			boost::asio::post(tp, [&mt, &circGtf, nowBegin, nowEnd, nowCircId]()
@@ -61,18 +61,16 @@ namespace circfull
 				std::string nowTranscriptId = nowBegin->getTranscriptId();
 				std::vector<circfull::RG::CircRecord>::iterator it = nowBegin, transcriptBegin = nowBegin;
 				int totalCount = 0;
-				// transcript list
+				std::string bsjAnnoAttr = " circ_type \"" + nowBegin->circ_type + "\"; host_gene_id \"" + nowBegin->host_gene_id + "\"; host_gene_name \"" + nowBegin->host_gene_name + "\";";
 				std::string transcriptList = "";
-				//TODO: add circRNA type: exonic, intronic, intergenic etc.
 				while (it != nowEnd) {
 					while (it != nowEnd && it->getTranscriptId() == nowTranscriptId)
 						it++;
 					if (it - transcriptBegin > 1) {
-						transcriptList += transcriptBegin->chr + "\tcircfull\ttranscript\t" + std::to_string(transcriptBegin->start) + "\t" + std::to_string(transcriptBegin->end) + "\t.\t" + transcriptBegin->strand + "\t.\tgene_id \"" + nowCircId + "\"; transcript_id \"" + nowTranscriptId + "\"; bsj \"" + std::to_string(it - transcriptBegin) + "\";\n";
-						// exon list
+						transcriptList += transcriptBegin->chr + "\tcircfull\ttranscript\t" + std::to_string(transcriptBegin->start) + "\t" + std::to_string(transcriptBegin->end) + "\t.\t" + transcriptBegin->strand + "\t.\tgene_id \"" + transcriptBegin->getCircId(false) + "\"; transcript_id \"" + nowTranscriptId + "\"; uniform_id \"" + transcriptBegin->uniform_id + "\";" + bsjAnnoAttr + " bsj \"" + std::to_string(it - transcriptBegin) + "\";\n";
 						auto exons = transcriptBegin->exons;
 						for (size_t i = 0; i < exons.size(); i++) {
-							transcriptList += transcriptBegin->chr + "\tcircfull\texon\t" + std::to_string(exons[i].first) + "\t" + std::to_string(exons[i].second) + "\t.\t" + transcriptBegin->strand + "\t.\tgene_id \"" + nowCircId + "\"; transcript_id \"" + nowTranscriptId + "\"; exon_number \"" + std::to_string(i + 1) + "\";\n";
+							transcriptList += transcriptBegin->chr + "\tcircfull\texon\t" + std::to_string(exons[i].first) + "\t" + std::to_string(exons[i].second) + "\t.\t" + transcriptBegin->strand + "\t.\tgene_id \"" + transcriptBegin->getCircId(false) + "\"; transcript_id \"" + nowTranscriptId + "\"; uniform_id \"" + transcriptBegin->uniform_id + "\"; exon_number \"" + std::to_string(i + 1) + "\";\n";
 						}
 						totalCount += it - transcriptBegin;
 					}
@@ -81,8 +79,7 @@ namespace circfull
 						nowTranscriptId = it->getTranscriptId();
 					}
 				}
-				//TODO: add circRNA strand info adjustment
-				std::string circBSJLine = nowBegin->chr + "\tcircfull\tgene\t" + std::to_string(nowBegin->start) + "\t" + std::to_string(nowBegin->end) + "\t.\t" + nowBegin->strand + "\t.\tgene_id \"" + nowBegin->getCircId() + "\"; bsj \"" + std::to_string(totalCount) + "\";\n";
+				std::string circBSJLine = nowBegin->chr + "\tcircfull\tBSJ\t" + std::to_string(nowBegin->start) + "\t" + std::to_string(nowBegin->end) + "\t.\t" + nowBegin->strand + "\t.\tgene_id \"" + nowBegin->getCircId(false) + "\";" + bsjAnnoAttr + " bsj \"" + std::to_string(totalCount) + "\";\n";
 				if (totalCount > 1) {
 					mt.lock();
 					circGtf << circBSJLine + transcriptList;
@@ -202,6 +199,352 @@ namespace circfull
 
 	namespace RG
 	{
+		const int ANNO_BOUNDARY_TOL = 10;
+
+		AnnotationIndex::AnnotationIndex(const GtfStorage &gtfRecords, const ExonIndex<> &_exonIndex) : exonIndex(_exonIndex)
+		{
+			for (const auto &[geneId, record] : gtfRecords)
+			{
+				if (record.type != GtfRecord::FeatureType::exon)
+					continue;
+				auto gi = geneInfo.find(record.geneId);
+				if (gi == geneInfo.end())
+				{
+					geneInfo[record.geneId] = {record.chr, record.geneName, record.strand, record.start, record.end};
+					chrToGenes[record.chr].push_back(record.geneId);
+				}
+				else
+				{
+					gi->second.geneStart = std::min(gi->second.geneStart, record.start);
+					gi->second.geneEnd = std::max(gi->second.geneEnd, record.end);
+					if (gi->second.geneName.empty() && !record.geneName.empty())
+						gi->second.geneName = record.geneName;
+				}
+				auto &transVec = geneTranscripts[record.geneId];
+				auto it = std::find_if(transVec.begin(), transVec.end(), [&](const TranscriptExonInfo &t)
+									   { return t.transcriptId == record.transcriptId; });
+				if (it == transVec.end())
+					transVec.push_back({record.transcriptId, {{record.start, record.end}}});
+				else
+					it->exons.push_back({record.start, record.end});
+			}
+			for (auto &[geneId, transVec] : geneTranscripts)
+				for (auto &t : transVec)
+					std::sort(t.exons.begin(), t.exons.end());
+			for (auto &[chr, genes] : chrToGenes)
+			{
+				std::sort(genes.begin(), genes.end());
+				genes.erase(std::unique(genes.begin(), genes.end()), genes.end());
+			}
+		}
+
+		namespace
+		{
+			int getExonNum5p3p(const TranscriptExonInfo &trans, int idx, char strand)
+			{
+				if (strand == '-')
+					return static_cast<int>(trans.exons.size()) - idx;
+				return idx + 1;
+			}
+
+			bool isRetainedIntron(const std::pair<int, int> &circExon, const TranscriptExonInfo &trans)
+			{
+				if (trans.exons.size() < 2)
+					return false;
+				for (size_t i = 0; i < trans.exons.size() - 1; i++)
+				{
+					int intronStart = trans.exons[i].second + 1;
+					int intronEnd = trans.exons[i + 1].first - 1;
+					if (intronStart > intronEnd)
+						continue;
+					if (circExon.first >= intronStart - ANNO_BOUNDARY_TOL && circExon.second <= intronEnd + ANNO_BOUNDARY_TOL &&
+						std::abs(circExon.first - intronStart) <= ANNO_BOUNDARY_TOL &&
+						std::abs(circExon.second - intronEnd) <= ANNO_BOUNDARY_TOL)
+						return true;
+				}
+				return false;
+			}
+
+			int findMatchingRefExon(const std::pair<int, int> &circExon, const TranscriptExonInfo &trans)
+			{
+				int bestIdx = -1, bestOverlap = 0;
+				for (size_t i = 0; i < trans.exons.size(); i++)
+				{
+					int overlap = std::min(circExon.second, trans.exons[i].second) - std::max(circExon.first, trans.exons[i].first);
+					if (overlap > bestOverlap && overlap > 0)
+					{
+						bestOverlap = overlap;
+						bestIdx = static_cast<int>(i);
+					}
+				}
+				return bestIdx;
+			}
+
+			std::string generateExonToken(const std::pair<int, int> &circExon, const std::pair<int, int> &refExon,
+										 int exonNum, char strand)
+			{
+				bool threePrimeLonger = false;
+				bool fivePrimeShorter = false;
+				if (strand == '+')
+				{
+					if (circExon.second > refExon.second + ANNO_BOUNDARY_TOL)
+						threePrimeLonger = true;
+					if (circExon.first > refExon.first + ANNO_BOUNDARY_TOL)
+						fivePrimeShorter = true;
+				}
+				else
+				{
+					if (circExon.first < refExon.first - ANNO_BOUNDARY_TOL)
+						threePrimeLonger = true;
+					if (circExon.second < refExon.second - ANNO_BOUNDARY_TOL)
+						fivePrimeShorter = true;
+				}
+				std::string token = std::to_string(exonNum);
+				if (threePrimeLonger)
+					token = "L" + token;
+				if (fivePrimeShorter)
+					token = token + "S";
+				return token;
+			}
+		}
+
+		AnnotationResult annotateOneCirc(const CircRecord &circ, const AnnotationIndex &idx)
+		{
+			AnnotationResult result;
+			const int searchRange = errorBSLen;
+
+			auto chrIt = idx.chrToGenes.find(circ.chr);
+			if (chrIt == idx.chrToGenes.end())
+			{
+				result.circ_type = "intergenic_region";
+				return result;
+			}
+
+			const std::string bsjStartKey = circ.chr + "_" + std::to_string(circ.start);
+			const std::string bsjEndKey = circ.chr + "_" + std::to_string(circ.end);
+			auto bsjSStart = idx.exonIndex.exonStartIndex.find(bsjStartKey);
+			auto bsjEEnd = idx.exonIndex.exonEndIndex.find(bsjEndKey);
+			auto bsjSEnd = idx.exonIndex.exonEndIndex.find(bsjStartKey);
+			auto bsjEStart = idx.exonIndex.exonStartIndex.find(bsjEndKey);
+
+			struct ExonLK
+			{
+				const std::set<std::string> *s1, *e1, *s2, *e2;
+			};
+			std::vector<ExonLK> exonLK;
+			for (const auto &exon : circ.exons)
+			{
+				std::string sk = circ.chr + "_" + std::to_string(exon.first);
+				std::string ek = circ.chr + "_" + std::to_string(exon.second);
+				auto ss1 = idx.exonIndex.exonStartIndex.find(sk);
+				auto ee1 = idx.exonIndex.exonEndIndex.find(ek);
+				auto se2 = idx.exonIndex.exonEndIndex.find(sk);
+				auto es2 = idx.exonIndex.exonStartIndex.find(ek);
+				exonLK.push_back({
+					ss1 != idx.exonIndex.exonStartIndex.end() ? &ss1->second : nullptr,
+					ee1 != idx.exonIndex.exonEndIndex.end() ? &ee1->second : nullptr,
+					se2 != idx.exonIndex.exonEndIndex.end() ? &se2->second : nullptr,
+					es2 != idx.exonIndex.exonStartIndex.end() ? &es2->second : nullptr});
+			}
+
+			auto checkBSJ = [&](const auto *a, const auto *b, const std::string &gid) -> bool
+			{
+				if (!a || !b)
+					return false;
+				return a->find(gid) != a->end() && b->find(gid) != b->end();
+			};
+
+			bool foundExon = false, foundIntron = false;
+			int bestGeneScore = -1;
+
+			for (const auto &geneId : chrIt->second)
+			{
+				auto gi = idx.geneInfo.find(geneId);
+				if (gi == idx.geneInfo.end())
+					continue;
+				const auto &gene = gi->second;
+
+				if (circ.strand != '.' && gene.strand != '.' && gene.strand != circ.strand)
+					continue;
+				if (circ.end < gene.geneStart - searchRange || circ.start > gene.geneEnd + searchRange)
+					continue;
+
+				if (!foundExon)
+				{
+					bool bs1 = (bsjSStart != idx.exonIndex.exonStartIndex.end() && bsjEEnd != idx.exonIndex.exonEndIndex.end() &&
+							   checkBSJ(&bsjSStart->second, &bsjEEnd->second, geneId));
+					bool bs2 = (bsjSEnd != idx.exonIndex.exonEndIndex.end() && bsjEStart != idx.exonIndex.exonStartIndex.end() &&
+							   checkBSJ(&bsjSEnd->second, &bsjEStart->second, geneId));
+					if (bs1 || bs2)
+					{
+						foundExon = true;
+					}
+					else
+					{
+						bool startIn = false, endIn = false;
+						auto gIt = idx.geneTranscripts.find(geneId);
+						if (gIt != idx.geneTranscripts.end())
+						{
+							for (const auto &trans : gIt->second)
+							{
+								for (const auto &ref : trans.exons)
+								{
+									if (!startIn && circ.start >= ref.first - ANNO_BOUNDARY_TOL && circ.start <= ref.second + ANNO_BOUNDARY_TOL)
+										startIn = true;
+									if (!endIn && circ.end >= ref.first - ANNO_BOUNDARY_TOL && circ.end <= ref.second + ANNO_BOUNDARY_TOL)
+										endIn = true;
+								}
+								if (startIn && endIn)
+									break;
+							}
+						}
+						if (startIn && endIn)
+							foundExon = true;
+					}
+				}
+				if (!foundExon && circ.start >= gene.geneStart - searchRange && circ.end <= gene.geneEnd + searchRange)
+					foundIntron = true;
+
+				int score = 0;
+				if (gene.strand == circ.strand)
+					score += 1000;
+				for (const auto &lk : exonLK)
+				{
+					if (lk.s1 && lk.s1->find(geneId) != lk.s1->end())
+						score += 10;
+					if (lk.e1 && lk.e1->find(geneId) != lk.e1->end())
+						score += 10;
+					if (lk.s2 && lk.s2->find(geneId) != lk.s2->end())
+						score += 10;
+					if (lk.e2 && lk.e2->find(geneId) != lk.e2->end())
+						score += 10;
+				}
+				auto gIt = idx.geneTranscripts.find(geneId);
+				if (gIt != idx.geneTranscripts.end())
+				{
+					for (const auto &trans : gIt->second)
+						for (const auto &ref : trans.exons)
+						{
+							for (const auto &exon : circ.exons)
+							{
+								int overlap = std::min(exon.second, ref.second) - std::max(exon.first, ref.first);
+								if (overlap > 0)
+									score += 1 + overlap;
+							}
+						}
+				}
+				if (score > bestGeneScore)
+				{
+					bestGeneScore = score;
+					result.host_gene_id = geneId;
+					result.host_gene_name = gene.geneName;
+					if (gIt != idx.geneTranscripts.end())
+					{
+						int bestTS = -1;
+						for (const auto &trans : gIt->second)
+						{
+							int ts = 0;
+							for (const auto &exon : circ.exons)
+							{
+								for (const auto &ref : trans.exons)
+								{
+									if (std::abs(exon.first - ref.first) <= ANNO_BOUNDARY_TOL && std::abs(exon.second - ref.second) <= ANNO_BOUNDARY_TOL)
+									{
+										ts += 20;
+										break;
+									}
+									int overlap = std::min(exon.second, ref.second) - std::max(exon.first, ref.first);
+									if (overlap > 0)
+										ts += 1 + overlap / 10;
+								}
+							}
+							if (ts > bestTS)
+							{
+								bestTS = ts;
+								result.bestTranscriptId = trans.transcriptId;
+							}
+						}
+					}
+				}
+			}
+
+			result.circ_type = foundExon ? "exon" : (foundIntron ? "intron" : "intergenic_region");
+			return result;
+		}
+
+		std::string generateUniformId(const CircRecord &circ, const AnnotationIndex &idx, const std::string &bestTranscriptId)
+		{
+			if (circ.host_gene_id.empty())
+				return "circIntergenic(" + circ.chr + ":" + std::to_string(circ.start) + "-" + std::to_string(circ.end) + ":" + circ.strand + ")";
+			std::string geneName = circ.host_gene_name;
+			if (geneName.empty())
+				geneName = circ.host_gene_id;
+			const TranscriptExonInfo *bestTrans = nullptr;
+			auto gIt = idx.geneTranscripts.find(circ.host_gene_id);
+			if (gIt != idx.geneTranscripts.end())
+			{
+				for (const auto &trans : gIt->second)
+				{
+					if (trans.transcriptId == bestTranscriptId)
+					{
+						bestTrans = &trans;
+						break;
+					}
+				}
+			}
+			std::vector<std::string> tokens;
+			auto exonList = circ.exons;
+			if (circ.strand == '-')
+				std::reverse(exonList.begin(), exonList.end());
+			for (const auto &exon : exonList)
+			{
+				if (!bestTrans)
+				{
+					tokens.push_back("NE");
+					continue;
+				}
+				int matchIdx = findMatchingRefExon(exon, *bestTrans);
+				if (matchIdx < 0)
+				{
+					if (isRetainedIntron(exon, *bestTrans))
+						tokens.push_back("RI");
+					else
+						tokens.push_back("NE");
+				}
+				else
+				{
+					int exonNum = getExonNum5p3p(*bestTrans, matchIdx, circ.strand);
+					tokens.push_back(generateExonToken(exon, bestTrans->exons[matchIdx], exonNum, circ.strand));
+				}
+			}
+			std::string id = "circ" + geneName + "(";
+			for (size_t i = 0; i < tokens.size(); i++)
+			{
+				if (i > 0)
+					id += ",";
+				id += tokens[i];
+			}
+			id += ")";
+			return id;
+		}
+
+		void annotateCircRNAs(std::vector<CircRecord> &circRecords, const GtfStorage &gtfRecords,
+							  const ExonIndex<> &exonIndex, int nthread)
+		{
+			AnnotationIndex idx(gtfRecords, exonIndex);
+			boost::asio::thread_pool tp(nthread);
+			for (size_t i = 0; i < circRecords.size(); i++)
+				boost::asio::post(tp, [&, i]()
+								  {
+					CircRecord &circ = circRecords[i];
+					auto result = annotateOneCirc(circ, idx);
+					circ.circ_type = result.circ_type;
+					circ.host_gene_id = result.host_gene_id;
+					circ.host_gene_name = result.host_gene_name;
+					circ.uniform_id = generateUniformId(circ, idx, result.bestTranscriptId); });
+			tp.join();
+		}
+
 		std::vector<circfull::RG::CircRecord> RG(CircfullOption &opt)
 		{
 			// align ccs pseudoSeq to the reference
@@ -245,6 +588,35 @@ namespace circfull
 			std::vector<CircRecord> circList{constructFullStruct(BSList, circCandidateInfo, genome, exonFSIndex, gtfRecords, fullStructFile, opt.nthread)};
 			std::filesystem::path adjFullStructFile{opt.oPath / "RG" / (opt.oPrefix + ".adj_full_struct.txt")};
 			circList = clustFullStruct(circList, adjFullStructFile, opt.nthread);
+			if (opt.circNumThres > 1) {
+				std::map<std::string, int> tcounts;
+				for (auto &circ : circList)
+					tcounts[circ.getTranscriptId()]++;
+				circList.erase(std::remove_if(circList.begin(), circList.end(),
+					[&](const CircRecord &c) { return tcounts[c.getTranscriptId()] < opt.circNumThres; }),
+					circList.end());
+			}
+			printTimeInfo("Annotating circRNAs.");
+			annotateCircRNAs(circList, gtfRecords, exonFSIndex, opt.nthread);
+			{
+				std::map<std::pair<std::string, std::string>, int> bsjsNum;
+				std::map<std::string, std::vector<std::string>> uniGroups;
+				for (auto &circ : circList)
+					uniGroups[circ.uniform_id].push_back(circ.getCircId());
+				for (auto &[base, bsjs] : uniGroups)
+				{
+					std::sort(bsjs.begin(), bsjs.end());
+					bsjs.erase(std::unique(bsjs.begin(), bsjs.end()), bsjs.end());
+					for (size_t n = 0; n < bsjs.size(); n++)
+						bsjsNum[{base, bsjs[n]}] = static_cast<int>(n + 1);
+				}
+				for (auto &circ : circList)
+				{
+					auto it = bsjsNum.find({circ.uniform_id, circ.getCircId()});
+					if (it != bsjsNum.end())
+						circ.uniform_id = circ.uniform_id + "." + std::to_string(it->second);
+				}
+			}
 			return circList;
 		}
 	}

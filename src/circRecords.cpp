@@ -327,9 +327,12 @@ namespace circfull
 				len += exon.second - exon.first + 1;
 		}
 
-		std::string CircRecord::getCircId() const
+		std::string CircRecord::getCircId(bool withStrand) const
 		{
-			return chr + ":" + std::to_string(start) + "-" + std::to_string(end) + ":" + strand;
+			std::string id = chr + ":" + std::to_string(start) + "-" + std::to_string(end);
+			if (withStrand)
+				id += ":" + std::string(1, strand);
+			return id;
 		}
 
 		std::string CircRecord::getExonsString() const

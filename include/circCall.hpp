@@ -258,9 +258,14 @@ namespace circfull
 			// std::vector<std::pair<std::string, std::string>> spliceSeqs;
 			unsigned long long int len;
 
+			std::string circ_type;
+			std::string host_gene_id;
+			std::string host_gene_name;
+			std::string uniform_id;
+
 			// update length of circRNA
 			void updateLength();
-			std::string getCircId() const;
+			std::string getCircId(bool withStrand = true) const;
 			std::string getExonsString() const;
 			std::string getTranscriptId() const;
 		};
@@ -285,6 +290,40 @@ namespace circfull
 
 		ExonIndex<std::string> getExonIndex(const GtfStorage &gtfList, const int errorLen);
 
+		struct GeneAnno
+		{
+			std::string chr, geneName;
+			char strand;
+			int geneStart, geneEnd;
+		};
+
+		struct TranscriptExonInfo
+		{
+			std::string transcriptId;
+			std::vector<std::pair<int, int>> exons;
+		};
+
+		class AnnotationIndex
+		{
+		public:
+			std::map<std::string, GeneAnno> geneInfo;
+			std::map<std::string, std::vector<TranscriptExonInfo>> geneTranscripts;
+			std::map<std::string, std::vector<std::string>> chrToGenes;
+			const ExonIndex<> &exonIndex;
+			AnnotationIndex(const GtfStorage &gtfRecords, const ExonIndex<> &_exonIndex);
+		};
+
+		struct AnnotationResult
+		{
+			std::string circ_type;
+			std::string host_gene_id;
+			std::string host_gene_name;
+			std::string bestTranscriptId;
+		};
+
+		AnnotationResult annotateOneCirc(const CircRecord &circ, const AnnotationIndex &idx);
+		std::string generateUniformId(const CircRecord &circ, const AnnotationIndex &idx, const std::string &bestTranscriptId);
+
 		std::vector<MapRecord> parseBam(referenceStorage &genome, std::filesystem::path output, std::filesystem::path bam, int nthread);
 
 		std::tuple<std::vector<MapRecord>, std::vector<MapRecord>, std::vector<MapRecord>> filterCandidateCircReads(/*std::filesystem::path mapInfo*/ std::vector<MapRecord> &records, referenceStorage &genome, std::filesystem::path fastq, std::filesystem::path oPrefix, int nthread);
@@ -300,6 +339,8 @@ namespace circfull
 		std::vector<CircRecord> constructFullStruct(std::vector<BSRecord> &BSList, std::vector<MapRecord> &mapList, const referenceStorage &genome, const ExonIndex<> &exonIndex, GtfStorage &gtfRecords, std::filesystem::path fullStructFile, int nthread);
 
 		std::vector<CircRecord> clustFullStruct(std::vector<CircRecord> &circList, std::filesystem::path adjFullStructFile, int nthread);
+
+		void annotateCircRNAs(std::vector<CircRecord> &circRecords, const GtfStorage &gtfRecords, const ExonIndex<> &exonIndex, int nthread);
 
 		std::vector<FusionCircRecord> identifyFusionCirc(std::vector<MapRecord> &sameChrFusionInfo, std::vector<MapRecord> &diffChrFusionInfo, const referenceStorage &genome, const ExonIndex<> &exonIndex, GtfStorage &gtfRecords, int nthread);
 
